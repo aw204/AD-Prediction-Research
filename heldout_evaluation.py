@@ -12,6 +12,8 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import io
+from PIL import Image
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
 import torch
 import torch.nn as nn
@@ -22,7 +24,7 @@ from torch.utils.data import DataLoader, TensorDataset
 # Evaluation configuration
 AUGMENTATION_FACTOR = 7
 NUM_SEEDS = 20  # Independent retraining runs, all scored on the same held-out set
-NUM_EPOCHS = 80  # Fixed Number
+NUM_EPOCHS = 80  # Fixed
 NUMERICAL_COLS = [0, 1]  # Only scale continuous variables (Age, Education)
 
 FEATURES_DIR = "data/augmented_final"
@@ -40,7 +42,7 @@ def seed_everything(seed=42):
 
 
 def fit_scaler(x_train):
-    # Compute mean and standard deviation strictly on the training cohort to prevent data leakage
+    # Compute mean and standard deviation strictly on the real training cohort to prevent data leakage
     mean = np.zeros(x_train.shape[1], dtype=np.float32)
     std = np.ones(x_train.shape[1], dtype=np.float32)
     mean[NUMERICAL_COLS] = x_train[:, NUMERICAL_COLS].mean(axis=0)
@@ -105,8 +107,8 @@ class LateFusionCategorical(nn.Module):
 
 def train_and_predict(x_train, y_train, sample_weights, x_heldout, x_train_eval, seed):
     """
-    Run one complete training pass and return probabilities on both the held-out set and the training
-    cohort. The training predictions are used to pick the decision threshold.
+    Run one complete training pass and return probabilities on both the held-out set and the real training
+    data. The training predictions are used to pick the decision threshold.
     """
     seed_everything(seed)
 
@@ -186,6 +188,21 @@ def youden_threshold(y_true, predictions):
     return thresholds[np.argmax(true_pos_rate - false_pos_rate)]
 
 
+def save_tif(fig, path, width_mm=180, dpi=300):
+    """Save `fig` as RGB, LZW-compressed TIFF, 300 dpi,
+    column width (180 mm two-column, 85 mm one-column).
+    Preserve figure's layout and aspect ratio.
+    """
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", facecolor="white")
+    buf.seek(0)
+    im = Image.open(buf).convert("RGB")               # drop alpha -> RGB
+    target_w = round(width_mm / 25.4 * dpi)           # 180 mm @ 300 dpi = 2126 px
+    target_h = round(im.height * target_w / im.width) # keep aspect ratio
+    im = im.resize((target_w, target_h), Image.LANCZOS)
+    im.save(path, compression="tiff_lzw", dpi=(dpi, dpi))
+
+
 def plot_confusion_matrices(results):
     """
     Two-panel figure of the mean confusion matrices, 0x on the left and 7x on the right.
@@ -236,8 +253,8 @@ def plot_confusion_matrices(results):
     fig.tight_layout()
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    save_path = os.path.join(OUT_DIR, "heldout_confusion_matrices.png")
-    fig.savefig(save_path, dpi=300, bbox_inches='tight')
+    save_path = os.path.join(OUT_DIR, "heldout_confusion_matrices.tif")
+    save_tif(fig, save_path)
     plt.close(fig)
     return save_path
 

@@ -9,7 +9,7 @@ The project trains a Tabular Denoising Diffusion Probabilistic Model (TabDDPM) o
 The model uses data extracted from the Alzheimer's Disease Neuroimaging Initiative (ADNI; adni.loni.usc.edu). The dataset includes:
 - age and years of education as continuous features
 - gender as a categorical feature
-- 168 *APOE*-region SNPs encoded as genotype states 0, 1, and 2
+- 168 *APOE*-region SNPs, reduced to 112 polymorphic SNPs after removing 56 monomorphic variants, encoded as genotype states 0, 1, and 2.
 - diagnostic status as the conditioning label for synthetic generation
 
 For predictive modeling, mild cognitive impairment and Alzheimer's disease are combined into one impaired class. ADNI data are not included in this repository and must be obtained through the ADNI data-access process.
@@ -26,7 +26,11 @@ For predictive modeling, mild cognitive impairment and Alzheimer's disease are c
 
 Machine type: ``Linux 11, 16 vCPUs, 64 GB RAM``.
 
-The TabDDPM pipeline runs in the conda environment:``bash conda activate tddpm``.
+The TabDDPM pipeline runs in the conda environment:
+
+```bash
+conda activate tddpm
+```
 
 The config sets `device = "cpu"`. All scripts run without a GPU, runtimes are manageable at this cohort size. 
 
@@ -92,17 +96,16 @@ Evaluates seven model and encoding configurations:
 6. **Late Fusion, numeric** - separate demographic and genomic branches, SNPs as raw genotype values
 7. **Late Fusion, categorical** - separate demographic and genomic branches, SNPs as learned embeddings
 
-Models are compared at synthetic-to-real augmentation ratios of 0× (real data only), 3×, 5×, 7×, and 10× using 5-fold stratified cross-validation repeated 10 times (50 folds total).
+Models are compared at synthetic-to-real augmentation ratios of 0× (real data only), 3×, 5×, 7×, and 10× using 5-fold stratified cross-validation repeated 10 times (50 runs total).
 
 ## Evaluate Held-Out Set (`heldout_evaluation.py`)
 
-The top-performing model (**Late Fusion Categorical**) is evaluated on the held-out cohort (N = 109), retrained on the 433-participant training cohort with 0× (real data only) and 7× synthetic augmentation.
+The top-performing model (**Late Fusion Categorical**) is evaluated on the held-out set (N = 109), retrained on the 433-participant training cohort with 0× (real data only) and 7× synthetic augmentation.
 
 * **Standardization:** statistics are fit on the training cohort only and applied unchanged to the held-out set.
 * **Threshold selection:** decision thresholds are chosen on training predictions using Youden's J statistic ($\max(\text{Sensitivity} + \text{Specificity} - 1)$) and applied unchanged to the held-out set.
 * **Multi-seed runs:** the model is trained 20 times with different random seeds (`N_SEEDS = 20`).
-* **Reporting:** sensitivity, specificity, and AUC are reported as the mean and standard deviation across runs. A seed-averaged confusion matrix is also produced by averaging predicted probabilities across the 20 runs.
-
+* **Reporting:** sensitivity, specificity, and AUC are reported as the mean and standard deviation across the 20 runs.
 
 ## TabDDPM reference
 
